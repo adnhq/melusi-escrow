@@ -64,11 +64,6 @@ contract MelusiEscrow {
      */
     error FailedToValidateInterfaceSupport();
 
-    // /**
-    //  * @dev The caller is a smart contract.
-    //  */
-    // error CallerIsContract();
-
     /**
      * @dev Access is restricted to addresses with the `MODERATOR_ROLE`
      */
@@ -104,10 +99,6 @@ contract MelusiEscrow {
         uint72  value; 
     } // Struct only used as input during data packing for multi swap
 
-    // uint256 private constant _BITPOS_TOKEN_ID = 160;
-    // uint256 private constant _BITPOS_VALUE = 184;
-    // uint256 private constant _BITMASK_TOKEN_ADDRESS = (1 << 160) - 1;
-
     bytes32 private constant MODERATOR_ROLE = 0x71f3d55856e4058ed06ee057d79ada615f65cdf5f9ee88181b914225088f834f; // keccak256("MODERATOR_ROLE")
 
     bytes4 private constant _INTERFACE_ID_721  = 0x80ac58cd;
@@ -130,23 +121,8 @@ contract MelusiEscrow {
     event MultiSwapInitiated(address indexed initiator, uint256[] packedAssetsData0, uint256[] packedAssetsData1, uint initiationFee);
     event MultiSwapFinalized(address indexed initiator, address indexed finalizer, uint256[] packedAssetsData0, uint256[] packedAssetsData1, uint finalizationFee);
     event MultiSwapCancelled(address indexed initiator, uint256 feeRefunded);
-    // Emit struct or change design pattern.
 
     event FeeCollected(address collector, uint256 amount);
-
-    // /**
-    //  * @dev Reverts if the caller is a smart contract.
-    //  */
-    // modifier notContract() {
-    //     bool isContract;
-
-    //     assembly {
-    //         isContract:= iszero(eq(origin(), caller()))
-    //     }
-
-    //     if(isContract) _revert(CallerIsContract.selector);
-    //     _;
-    // }
 
     /**
      * @dev Reverts if either `msg.value` or `cashToBeAdded` is greater than the uint128 max limit.
@@ -161,7 +137,6 @@ contract MelusiEscrow {
         if(notInRange) _revert(CashToBeAddedOrValueTooHigh.selector);
         _;
     }
-    // deferring fees?
 
     /**
      * @notice Initiates a one to one asset swap.
@@ -182,7 +157,7 @@ contract MelusiEscrow {
         uint256 packedAssetData0,
         uint256 packedAssetData1
     ) external payable cashInRange(cashToBeAdded) {
-        SingleSwap storage singleSwap = _singleSwapsPackedData[msg.sender]; // Check gas with memory struct and assigning to storage at end 
+        SingleSwap storage singleSwap = _singleSwapsPackedData[msg.sender];
         if(singleSwap.packedAssetData0 != 0) 
             _revert(SingleSwapExists.selector);
 
@@ -312,7 +287,7 @@ contract MelusiEscrow {
      */
     function finalizeMultiSwap(address initiator) external payable {
         MultiSwap memory multiSwap = _multiSwapsPackedData[initiator];
-        uint256 length0 = multiSwap.packedAssetsData0.length; // Cache?
+        uint256 length0 = multiSwap.packedAssetsData0.length;
         uint256 length1 = multiSwap.packedAssetsData1.length;
 
         if(length1 == 0) _revert(SwapNonExistent.selector);
@@ -351,7 +326,7 @@ contract MelusiEscrow {
             }
         }
 
-        emit MultiSwapFinalized(initiator, msg.sender, multiSwap.packedAssetsData0, multiSwap.packedAssetsData0, finalizationFee);
+        emit MultiSwapFinalized(initiator, msg.sender, multiSwap.packedAssetsData0, multiSwap.packedAssetsData1, finalizationFee);
     }
 
     /**
@@ -542,7 +517,7 @@ contract MelusiEscrow {
     function getUnpackedCashData(uint256 packedCashData) public pure returns (uint256 initiationFee, uint256 cashToBeAdded) {
         assembly {
             initiationFee := shr(128, packedCashData)
-            cashToBeAdded := and(packedCashData, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+            cashToBeAdded := and(packedCashData, 0xffffffffffffffffffffffffffffffff) // Correct mask for lower 128 bits
         }
     }
 
@@ -563,7 +538,6 @@ contract MelusiEscrow {
      * @dev Performs a token transfer using the appropriate interface.
      */
     function _transferAsset(address from, address to, address token, uint256 tokenId, uint256 value) private {
-        // Move _supportsInterface check here ?
         if(value == 0) 
             IERC721(token).safeTransferFrom(from, to, tokenId, "");
         else 
